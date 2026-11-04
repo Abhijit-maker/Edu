@@ -2,8 +2,13 @@ name: Build Signed EduVault Android APK (eduvault.apk)
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "*" ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-android-apk:
@@ -18,8 +23,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
+      - name: Setup Android SDK (API 35)
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
 
       - name: Generate V1+V2+V3 Release Signing Keystore (Play Protect Safe)
         working-directory: ./android
@@ -39,11 +49,12 @@ jobs:
       - name: Build Signed Release APK (eduvault.apk)
         working-directory: ./android
         run: |
-          gradle assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/*.apk ../eduvault.apk
+          gradle assembleRelease --no-daemon --stacktrace
+          find app/build/outputs/apk/release -name "*.apk" -exec cp {} ../eduvault.apk \;
 
       - name: Upload eduvault.apk Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: eduvault-signed-apk
+          name: eduvault-apk
           path: eduvault.apk
+          if-no-files-found: error
