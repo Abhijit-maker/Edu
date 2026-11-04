@@ -1,0 +1,225 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Student profile and real-time study progress in EduVault.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "board": { "type": "string", "enum": ["WBCHSE", "WBBSE"] },
+        "className": { "type": "string", "maxLength": 20 },
+        "semester": { "type": "string", "maxLength": 20 },
+        "studyPoints": { "type": "number" },
+        "level": { "type": "number" },
+        "booksRead": { "type": "number" },
+        "quizzesCompleted": { "type": "number" },
+        "studyHours": { "type": "number" },
+        "language": { "type": "string", "enum": ["bn", "en"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "board", "className", "semester", "studyPoints", "level", "booksRead", "quizzesCompleted", "studyHours", "language", "createdAt", "updatedAt"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Administrator registry for server/rule verification.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "role": { "type": "string", "enum": ["admin", "super_admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "role", "createdAt"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Official study PDF material uploaded by Admin and broadcast to all students.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "titleBn": { "type": "string", "maxLength": 200 },
+        "board": { "type": "string", "enum": ["WBCHSE", "WBBSE"] },
+        "className": { "type": "string", "maxLength": 20 },
+        "semester": { "type": "string", "maxLength": 20 },
+        "subject": { "type": "string", "maxLength": 60 },
+        "chapter": { "type": "string", "maxLength": 120 },
+        "fileSize": { "type": "string", "maxLength": 30 },
+        "pageCount": { "type": "number" },
+        "contentSummary": { "type": "string", "maxLength": 8000 },
+        "pdfDataUrl": { "type": "string", "maxLength": 750000 },
+        "authorUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "isOfficial": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "board", "className", "semester", "subject", "chapter", "fileSize", "pageCount", "contentSummary", "authorUid", "isOfficial", "createdAt", "updatedAt"]
+    },
+    "QuizQuestion": {
+      "title": "QuizQuestion",
+      "description": "Official MCQ created by Admin in Firestore.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "board": { "type": "string", "enum": ["WBCHSE", "WBBSE"] },
+        "className": { "type": "string", "maxLength": 20 },
+        "subject": { "type": "string", "maxLength": 60 },
+        "chapter": { "type": "string", "maxLength": 120 },
+        "question": { "type": "string", "minLength": 3, "maxLength": 500 },
+        "optionA": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "optionB": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "optionC": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "optionD": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "correctKey": { "type": "string", "enum": ["A", "B", "C", "D"] },
+        "explanation": { "type": "string", "maxLength": 600 },
+        "authorUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "isPublished": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "board", "className", "subject", "chapter", "question", "optionA", "optionB", "optionC", "optionD", "correctKey", "explanation", "authorUid", "isPublished", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Real-time broadcast notification sent by Admin to all students.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "body": { "type": "string", "minLength": 2, "maxLength": 1000 },
+        "type": { "type": "string", "enum": ["new_pdf", "new_quiz", "announcement", "admin_update"] },
+        "targetBoard": { "type": "string", "enum": ["ALL", "WBCHSE", "WBBSE"] },
+        "materialId": { "type": "string", "maxLength": 128 },
+        "senderUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "isBroadcast": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "body", "type", "targetBoard", "senderUid", "senderName", "isBroadcast", "createdAt"]
+    },
+    "ReadingProgress": {
+      "title": "ReadingProgress",
+      "description": "Student reading progress and last read page for a PDF material.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "materialId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "materialTitle": { "type": "string", "maxLength": 160 },
+        "subject": { "type": "string", "maxLength": 60 },
+        "currentPage": { "type": "number" },
+        "totalPages": { "type": "number" },
+        "progressPercent": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "materialId", "materialTitle", "subject", "currentPage", "totalPages", "progressPercent", "createdAt", "updatedAt"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "Bookmarked PDF material or page for a student.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "materialId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "materialTitle": { "type": "string", "maxLength": 160 },
+        "subject": { "type": "string", "maxLength": 60 },
+        "pageNumber": { "type": "number" },
+        "note": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "materialId", "materialTitle", "subject", "pageNumber", "note", "createdAt"]
+    },
+    "Annotation": {
+      "title": "Annotation",
+      "description": "Personal highlight or note inside a PDF document.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "materialId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "pageNumber": { "type": "number" },
+        "type": { "type": "string", "enum": ["highlight", "note"] },
+        "content": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "color": { "type": "string", "maxLength": 20 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "materialId", "pageNumber", "type", "content", "color", "createdAt"]
+    },
+    "QuizAttempt": {
+      "title": "QuizAttempt",
+      "description": "Completed quiz attempt record for a student.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "quizId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "quizTitle": { "type": "string", "maxLength": 160 },
+        "subject": { "type": "string", "maxLength": 60 },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "timeSpentSeconds": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "quizId", "quizTitle", "subject", "score", "totalQuestions", "timeSpentSeconds", "createdAt"]
+    },
+    "CommunityPost": {
+      "title": "CommunityPost",
+      "description": "Student discussion post or academic doubt in the community.",
+      "type": "object",
+      "properties": {
+        "authorUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "board": { "type": "string", "enum": ["WBCHSE", "WBBSE"] },
+        "subject": { "type": "string", "maxLength": 60 },
+        "title": { "type": "string", "minLength": 3, "maxLength": 180 },
+        "content": { "type": "string", "minLength": 5, "maxLength": 2000 },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUid", "authorName", "board", "subject", "title", "content", "likesCount", "commentsCount", "isPublic", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Student profile and progress documents isolated per user."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Verified administrator accounts."
+    },
+    "/materials/{materialId}": {
+      "schema": { "$ref": "#/entities/Material" },
+      "description": "Official study PDFs uploaded by Admin."
+    },
+    "/quizzes/{quizId}": {
+      "schema": { "$ref": "#/entities/QuizQuestion" },
+      "description": "Official MCQs created by Admin."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Real-time notifications broadcast by Admin to all students."
+    },
+    "/reading_progress/{progressId}": {
+      "schema": { "$ref": "#/entities/ReadingProgress" },
+      "description": "Student reading progress per material."
+    },
+    "/bookmarks/{bookmarkId}": {
+      "schema": { "$ref": "#/entities/Bookmark" },
+      "description": "Student saved PDF bookmarks."
+    },
+    "/annotations/{annotationId}": {
+      "schema": { "$ref": "#/entities/Annotation" },
+      "description": "Student PDF highlights and personal notes."
+    },
+    "/quiz_attempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/QuizAttempt" },
+      "description": "Student quiz submission scores and history."
+    },
+    "/community_posts/{postId}": {
+      "schema": { "$ref": "#/entities/CommunityPost" },
+      "description": "Student discussion posts and academic doubts."
+    }
+  }
+}

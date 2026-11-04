@@ -1,0 +1,6 @@
+{
+  "name": "EduVault — WBCHSE & WBBSE Digital Study Library",
+  "description": "Native Android Kotlin & Jetpack Compose EdTech study library for West Bengal Board (WBCHSE & WBBSE) students with Firebase, PDF Reader, Quizzes, and Gemini AI PDF Assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

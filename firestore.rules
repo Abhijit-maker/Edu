@@ -1,0 +1,481 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: Default deny all unmatched paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // GLOBAL PRIMITIVES & HARDENED HELPERS
+    // =========================================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == "jnictabhi9632@gmail.com"
+      );
+    }
+
+    // =========================================================================
+    // ENTITY VALIDATION BLUEPRINTS
+    // =========================================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll([
+        'uid', 'displayName', 'board', 'className', 'semester',
+        'studyPoints', 'level', 'booksRead', 'quizzesCompleted',
+        'studyHours', 'language', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'uid', 'displayName', 'board', 'className', 'semester',
+        'studyPoints', 'level', 'booksRead', 'quizzesCompleted',
+        'studyHours', 'language', 'createdAt', 'updatedAt'
+      ]) &&
+      data.uid == request.auth.uid &&
+      isValidId(data.uid) &&
+      data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+      data.board is string && (data.board == 'WBCHSE' || data.board == 'WBBSE') &&
+      data.className is string && data.className.size() >= 1 && data.className.size() <= 20 &&
+      data.semester is string && data.semester.size() >= 1 && data.semester.size() <= 20 &&
+      data.studyPoints is int && data.studyPoints >= 0 && data.studyPoints <= 1000000 &&
+      data.level is int && data.level >= 1 && data.level <= 100 &&
+      data.booksRead is int && data.booksRead >= 0 && data.booksRead <= 10000 &&
+      data.quizzesCompleted is int && data.quizzesCompleted >= 0 && data.quizzesCompleted <= 10000 &&
+      data.studyHours is number && data.studyHours >= 0 && data.studyHours <= 50000 &&
+      data.language is string && (data.language == 'bn' || data.language == 'en') &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['uid', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'role', 'createdAt']) &&
+        isValidId(data.uid) &&
+        data.role is string && (data.role == 'admin' || data.role == 'super_admin') &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidMaterial(data) {
+      return data.keys().hasAll([
+        'id', 'title', 'board', 'className', 'semester', 'subject',
+        'chapter', 'fileSize', 'pageCount', 'contentSummary', 'authorUid', 'isOfficial',
+        'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id', 'title', 'titleBn', 'board', 'className', 'semester', 'subject',
+        'chapter', 'fileSize', 'pageCount', 'contentSummary', 'pdfDataUrl', 'authorUid', 'isOfficial',
+        'createdAt', 'updatedAt'
+      ]) &&
+      isValidId(data.id) &&
+      data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+      (!('titleBn' in data) || (data.titleBn is string && data.titleBn.size() <= 200)) &&
+      data.board is string && (data.board == 'WBCHSE' || data.board == 'WBBSE') &&
+      data.className is string && data.className.size() >= 1 && data.className.size() <= 20 &&
+      data.semester is string && data.semester.size() >= 1 && data.semester.size() <= 20 &&
+      data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60 &&
+      data.chapter is string && data.chapter.size() >= 1 && data.chapter.size() <= 120 &&
+      data.fileSize is string && data.fileSize.size() >= 1 && data.fileSize.size() <= 30 &&
+      data.pageCount is int && data.pageCount >= 1 && data.pageCount <= 2000 &&
+      data.contentSummary is string && data.contentSummary.size() >= 1 && data.contentSummary.size() <= 8000 &&
+      (!('pdfDataUrl' in data) || (data.pdfDataUrl is string && data.pdfDataUrl.size() <= 750000)) &&
+      data.authorUid == request.auth.uid &&
+      isValidId(data.authorUid) &&
+      data.isOfficial is bool &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidQuizQuestion(data) {
+      return data.keys().hasAll([
+        'id', 'board', 'className', 'subject', 'chapter', 'question',
+        'optionA', 'optionB', 'optionC', 'optionD', 'correctKey',
+        'explanation', 'authorUid', 'isPublished', 'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id', 'board', 'className', 'subject', 'chapter', 'question',
+        'optionA', 'optionB', 'optionC', 'optionD', 'correctKey',
+        'explanation', 'authorUid', 'isPublished', 'createdAt'
+      ]) &&
+      isValidId(data.id) &&
+      data.board is string && (data.board == 'WBCHSE' || data.board == 'WBBSE') &&
+      data.className is string && data.className.size() >= 1 && data.className.size() <= 20 &&
+      data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60 &&
+      data.chapter is string && data.chapter.size() >= 1 && data.chapter.size() <= 120 &&
+      data.question is string && data.question.size() >= 3 && data.question.size() <= 500 &&
+      data.optionA is string && data.optionA.size() >= 1 && data.optionA.size() <= 200 &&
+      data.optionB is string && data.optionB.size() >= 1 && data.optionB.size() <= 200 &&
+      data.optionC is string && data.optionC.size() >= 1 && data.optionC.size() <= 200 &&
+      data.optionD is string && data.optionD.size() >= 1 && data.optionD.size() <= 200 &&
+      data.correctKey is string && (data.correctKey == 'A' || data.correctKey == 'B' || data.correctKey == 'C' || data.correctKey == 'D') &&
+      data.explanation is string && data.explanation.size() <= 600 &&
+      data.authorUid == request.auth.uid &&
+      isValidId(data.authorUid) &&
+      data.isPublished is bool &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll([
+        'id', 'title', 'body', 'type', 'targetBoard',
+        'senderUid', 'senderName', 'isBroadcast', 'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id', 'title', 'body', 'type', 'targetBoard', 'materialId',
+        'senderUid', 'senderName', 'isBroadcast', 'createdAt'
+      ]) &&
+      isValidId(data.id) &&
+      data.title is string && data.title.size() >= 2 && data.title.size() <= 140 &&
+      data.body is string && data.body.size() >= 2 && data.body.size() <= 1000 &&
+      data.type is string && (data.type == 'new_pdf' || data.type == 'new_quiz' || data.type == 'announcement' || data.type == 'admin_update') &&
+      data.targetBoard is string && (data.targetBoard == 'ALL' || data.targetBoard == 'WBCHSE' || data.targetBoard == 'WBBSE') &&
+      (!('materialId' in data) || (data.materialId is string && data.materialId.size() <= 128)) &&
+      data.senderUid == request.auth.uid &&
+      isValidId(data.senderUid) &&
+      data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 100 &&
+      data.isBroadcast is bool &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidReadingProgress(data) {
+      return data.keys().hasAll([
+        'userId', 'materialId', 'materialTitle', 'subject',
+        'currentPage', 'totalPages', 'progressPercent', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId', 'materialId', 'materialTitle', 'subject',
+        'currentPage', 'totalPages', 'progressPercent', 'createdAt', 'updatedAt'
+      ]) &&
+      data.userId == request.auth.uid &&
+      isValidId(data.userId) &&
+      isValidId(data.materialId) &&
+      data.materialTitle is string && data.materialTitle.size() >= 1 && data.materialTitle.size() <= 160 &&
+      data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60 &&
+      data.currentPage is int && data.currentPage >= 1 && data.currentPage <= 2000 &&
+      data.totalPages is int && data.totalPages >= 1 && data.totalPages <= 2000 &&
+      data.progressPercent is int && data.progressPercent >= 0 && data.progressPercent <= 100 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidBookmark(data) {
+      return data.keys().hasAll([
+        'userId', 'materialId', 'materialTitle', 'subject',
+        'pageNumber', 'note', 'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId', 'materialId', 'materialTitle', 'subject',
+        'pageNumber', 'note', 'createdAt'
+      ]) &&
+      data.userId == request.auth.uid &&
+      isValidId(data.userId) &&
+      isValidId(data.materialId) &&
+      data.materialTitle is string && data.materialTitle.size() >= 1 && data.materialTitle.size() <= 160 &&
+      data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60 &&
+      data.pageNumber is int && data.pageNumber >= 1 && data.pageNumber <= 2000 &&
+      data.note is string && data.note.size() <= 500 &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidAnnotation(data) {
+      return data.keys().hasAll([
+        'userId', 'materialId', 'pageNumber', 'type',
+        'content', 'color', 'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId', 'materialId', 'pageNumber', 'type',
+        'content', 'color', 'createdAt'
+      ]) &&
+      data.userId == request.auth.uid &&
+      isValidId(data.userId) &&
+      isValidId(data.materialId) &&
+      data.pageNumber is int && data.pageNumber >= 1 && data.pageNumber <= 2000 &&
+      data.type is string && (data.type == 'highlight' || data.type == 'note') &&
+      data.content is string && data.content.size() >= 1 && data.content.size() <= 1000 &&
+      data.color is string && data.color.size() >= 1 && data.color.size() <= 20 &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidQuizAttempt(data) {
+      return data.keys().hasAll([
+        'userId', 'quizId', 'quizTitle', 'subject',
+        'score', 'totalQuestions', 'timeSpentSeconds', 'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId', 'quizId', 'quizTitle', 'subject',
+        'score', 'totalQuestions', 'timeSpentSeconds', 'createdAt'
+      ]) &&
+      data.userId == request.auth.uid &&
+      isValidId(data.userId) &&
+      isValidId(data.quizId) &&
+      data.quizTitle is string && data.quizTitle.size() >= 1 && data.quizTitle.size() <= 160 &&
+      data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60 &&
+      data.score is int && data.score >= 0 && data.score <= 100 &&
+      data.totalQuestions is int && data.totalQuestions >= 1 && data.totalQuestions <= 100 &&
+      data.timeSpentSeconds is int && data.timeSpentSeconds >= 0 && data.timeSpentSeconds <= 10800 &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidCommunityPost(data) {
+      return data.keys().hasAll([
+        'authorUid', 'authorName', 'board', 'subject', 'title',
+        'content', 'likesCount', 'commentsCount', 'isPublic',
+        'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'authorUid', 'authorName', 'board', 'subject', 'title',
+        'content', 'likesCount', 'commentsCount', 'isPublic',
+        'createdAt', 'updatedAt'
+      ]) &&
+      data.authorUid == request.auth.uid &&
+      isValidId(data.authorUid) &&
+      data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 100 &&
+      data.board is string && (data.board == 'WBCHSE' || data.board == 'WBBSE') &&
+      data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60 &&
+      data.title is string && data.title.size() >= 3 && data.title.size() <= 180 &&
+      data.content is string && data.content.size() >= 5 && data.content.size() <= 2000 &&
+      data.likesCount is int && data.likesCount >= 0 && data.likesCount <= 100000 &&
+      data.commentsCount is int && data.commentsCount >= 0 && data.commentsCount <= 10000 &&
+      data.isPublic is bool &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // COLLECTION MATCH BLOCKS
+    // =========================================================================
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        isValidUser(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isValidUser(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            request.auth.uid == userId &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'displayName', 'board', 'className', 'semester',
+              'studyPoints', 'level', 'booksRead', 'quizzesCompleted',
+              'studyHours', 'language', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if isVerifiedUser() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+    }
+
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(adminId) && isValidAdmin(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidId(adminId) && isValidAdmin(incoming()) && incoming().uid == existing().uid && incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin() && isValidId(adminId);
+    }
+
+    match /materials/{materialId} {
+      allow get: if isSignedIn() && isValidId(materialId) && (existing().isOfficial == true || isAdmin());
+      allow list: if isSignedIn() && (existing().isOfficial == true || isAdmin());
+      allow create: if isAdmin() &&
+        isValidId(materialId) &&
+        isValidMaterial(incoming()) &&
+        incoming().id == materialId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isAdmin() &&
+        isValidId(materialId) &&
+        isValidMaterial(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().authorUid == existing().authorUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'titleBn', 'board', 'className', 'semester',
+          'subject', 'chapter', 'fileSize', 'pageCount', 'contentSummary', 'pdfDataUrl', 'isOfficial', 'updatedAt'
+        ]);
+      allow delete: if isAdmin() && isValidId(materialId);
+    }
+
+    match /quizzes/{quizId} {
+      allow get: if isSignedIn() && isValidId(quizId) && (existing().isPublished == true || isAdmin());
+      allow list: if isSignedIn() && (existing().isPublished == true || isAdmin());
+      allow create: if isAdmin() &&
+        isValidId(quizId) &&
+        isValidQuizQuestion(incoming()) &&
+        incoming().id == quizId &&
+        incoming().createdAt == request.time;
+      allow update: if isAdmin() &&
+        isValidId(quizId) &&
+        isValidQuizQuestion(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().authorUid == existing().authorUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'question', 'optionA', 'optionB', 'optionC', 'optionD', 'correctKey', 'explanation', 'isPublished'
+        ]);
+      allow delete: if isAdmin() && isValidId(quizId);
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && isValidId(notificationId) && (existing().isBroadcast == true || isAdmin());
+      allow list: if isSignedIn() && (existing().isBroadcast == true || isAdmin());
+      allow create: if isAdmin() &&
+        isValidId(notificationId) &&
+        isValidNotification(incoming()) &&
+        incoming().id == notificationId &&
+        incoming().createdAt == request.time;
+      allow update: if isAdmin() &&
+        isValidId(notificationId) &&
+        isValidNotification(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().senderUid == existing().senderUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'body', 'isBroadcast']);
+      allow delete: if isAdmin() && isValidId(notificationId);
+    }
+
+    match /reading_progress/{progressId} {
+      allow get: if isSignedIn() && isValidId(progressId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() &&
+        isValidId(progressId) &&
+        isValidReadingProgress(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() &&
+        isValidId(progressId) &&
+        isValidReadingProgress(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().materialId == existing().materialId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().userId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'currentPage', 'totalPages', 'progressPercent', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if isVerifiedUser() && isValidId(progressId) && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    match /bookmarks/{bookmarkId} {
+      allow get: if isSignedIn() && isValidId(bookmarkId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() &&
+        isValidId(bookmarkId) &&
+        isValidBookmark(incoming()) &&
+        incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() &&
+        isValidId(bookmarkId) &&
+        isValidBookmark(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().materialId == existing().materialId &&
+        incoming().createdAt == existing().createdAt && (
+          isAdmin() ||
+          (
+            existing().userId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['note', 'pageNumber'])
+          )
+        );
+      allow delete: if isVerifiedUser() && isValidId(bookmarkId) && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    match /annotations/{annotationId} {
+      allow get: if isSignedIn() && isValidId(annotationId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() &&
+        isValidId(annotationId) &&
+        isValidAnnotation(incoming()) &&
+        incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() &&
+        isValidId(annotationId) &&
+        isValidAnnotation(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().materialId == existing().userId &&
+        incoming().createdAt == existing().createdAt && (
+          isAdmin() ||
+          (
+            existing().userId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['content', 'color'])
+          )
+        );
+      allow delete: if isVerifiedUser() && isValidId(annotationId) && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    match /quiz_attempts/{attemptId} {
+      allow get: if isSignedIn() && isValidId(attemptId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() &&
+        isValidId(attemptId) &&
+        isValidQuizAttempt(incoming()) &&
+        incoming().createdAt == request.time;
+      allow update: if isAdmin() &&
+        isValidId(attemptId) &&
+        isValidQuizAttempt(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin() && isValidId(attemptId);
+    }
+
+    match /community_posts/{postId} {
+      allow get: if isSignedIn() && isValidId(postId) && (existing().isPublic == true || existing().authorUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().isPublic == true || existing().authorUid == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() &&
+        isValidId(postId) &&
+        isValidCommunityPost(incoming()) &&
+        incoming().likesCount == 0 &&
+        incoming().commentsCount == 0 &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() &&
+        isValidId(postId) &&
+        isValidCommunityPost(incoming()) &&
+        incoming().authorUid == existing().authorUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().authorUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'updatedAt'])
+          ) ||
+          (
+            existing().isPublic == true &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'commentsCount', 'updatedAt'])
+          )
+        );
+      allow delete: if isVerifiedUser() && isValidId(postId) && (existing().authorUid == request.auth.uid || isAdmin());
+    }
+  }
+}

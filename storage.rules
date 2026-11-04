@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedAdmin() {
+      return isSignedIn() &&
+        request.auth.token.email_verified == true && (
+          firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid)) ||
+          request.auth.token.email == "jnictabhi9632@gmail.com"
+        );
+    }
+
+    function isValidPdfUpload() {
+      return request.resource.size <= 25 * 1024 * 1024 &&
+        request.resource.contentType.matches('application/pdf');
+    }
+
+    function isValidImageUpload() {
+      return request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // Official WBCHSE & WBBSE Study Materials (Admin-only write, signed-in student read)
+    match /eduvault/materials/{board}/{className}/{semester}/{subject}/{fileName} {
+      allow read: if isSignedIn();
+      allow create, update: if isVerifiedAdmin() && isValidPdfUpload();
+      allow delete: if isVerifiedAdmin();
+    }
+
+    // Thumbnails for PDF covers
+    match /eduvault/thumbnails/{fileName} {
+      allow read: if isSignedIn();
+      allow create, update: if isVerifiedAdmin() && isValidImageUpload();
+      allow delete: if isVerifiedAdmin();
+    }
+
+    // User profile avatars (Isolated per userUid)
+    match /eduvault/avatars/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.auth.uid == userId && isValidImageUpload();
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isVerifiedAdmin());
+    }
+
+    // Default deny all other storage paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
